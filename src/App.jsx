@@ -48,7 +48,7 @@ const LoginScreen = ({ onLogin }) => {
   const [keyword, setKeyword] = useState('');
   const [error, setError] = useState('');
 
-  const SECRET_KEYWORD = 'ふじみこうけん';
+  const SECRET_KEYWORD = import.meta.env.VITE_SECRET_KEYWORD || 'ふじみこうけん';
 
   const handleSubmit = (e) => {
     e.preventDefault();
