@@ -1,17 +1,185 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
-import { PlusCircle, List, ChevronLeft, MapPin, Camera, Save, Info, Trash2 } from 'lucide-react';
+import { PlusCircle, List, ChevronLeft, MapPin, Camera, Save, Info, Trash2, LogOut, Lock, Mail } from 'lucide-react';
 import './index.css';
 
-// --- Components ---
+// --- Authentication Config ---
 
-const TopScreen = () => {
+// 本番運用に合わせて、初期のテストアカウントはすべて削除されました。
+// 新規登録には管理者から伝えられた合言葉が必要です。
+const ALLOWED_USERS = [];
+
+// --- Authentication Components ---
+
+const LogoutButton = ({ user, onLogout }) => {
+  return (
+    <button 
+      onClick={onLogout}
+      style={{ 
+        position: 'fixed', 
+        top: '1rem', 
+        right: '1rem', 
+        background: 'rgba(255, 255, 255, 0.8)', 
+        backdropFilter: 'blur(8px)',
+        border: '1px solid var(--card-border)', 
+        borderRadius: '20px',
+        padding: '8px 16px',
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '6px',
+        color: 'var(--text-muted)',
+        cursor: 'pointer',
+        fontSize: '0.8rem',
+        zIndex: 9999, // 常に最前面
+        boxShadow: 'var(--shadow)'
+      }}
+      title={`${user?.email} からログアウト`}
+    >
+      <LogOut size={14} />
+      <span>ログアウト</span>
+    </button>
+  );
+};
+
+const LoginScreen = ({ onLogin }) => {
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [keyword, setKeyword] = useState('');
+  const [error, setError] = useState('');
+
+  const SECRET_KEYWORD = 'ふじみこうけん';
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (isRegistering) {
+      // 合言葉のチェック
+      if (keyword !== SECRET_KEYWORD) {
+        setError('合言葉が正しくありません');
+        return;
+      }
+
+      // 新規登録処理
+      const registeredUsers = JSON.parse(localStorage.getItem('app-registered-users') || '[]');
+      if (registeredUsers.some(u => u.email === email) || ALLOWED_USERS.some(u => u.email === email)) {
+        setError('このメールアドレスは既に登録されています');
+        return;
+      }
+      const newUser = { email, password };
+      localStorage.setItem('app-registered-users', JSON.stringify([...registeredUsers, newUser]));
+      alert('登録が完了しました！ログインしてください');
+      setIsRegistering(false);
+      setPassword('');
+      setKeyword('');
+    } else {
+      // ログイン処理
+      const registeredUsers = JSON.parse(localStorage.getItem('app-registered-users') || '[]');
+      const allUsers = [...ALLOWED_USERS, ...registeredUsers];
+      const user = allUsers.find(u => u.email === email && u.password === password);
+      
+      if (user) {
+        onLogin({ email: user.email });
+      } else {
+        setError('メールアドレスまたはパスワードが正しくありません');
+      }
+    }
+  };
+
+  return (
+    <div className="container fade-in" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
+      <div className="glass-card" style={{ padding: '3rem', width: '100%', maxWidth: '400px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ background: 'var(--primary)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+            <Lock color="white" size={32} />
+          </div>
+          <h2>{isRegistering ? '新規ユーザー登録' : 'ログイン'}</h2>
+          <p style={{ color: 'var(--text-muted)' }}>
+            {isRegistering ? '関係者限定のユーザー登録' : '設備台帳システムにアクセス'}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', fontWeight: '600' }}>
+              <Mail size={16} /> メールアドレス
+            </label>
+            <input 
+              type="email" 
+              placeholder="example@example.com" 
+              required
+              className="input-field"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', fontWeight: '600' }}>
+              <Lock size={16} /> パスワード
+            </label>
+            <input 
+              type="password" 
+              placeholder="••••••••" 
+              required
+              className="input-field"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          {isRegistering && (
+            <div className="form-group" style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid var(--primary)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.5rem', fontWeight: '600', color: 'var(--primary)' }}>
+                <Info size={16} /> 合言葉
+              </label>
+              <input 
+                type="text" 
+                placeholder="合言葉を入力" 
+                required
+                className="input-field"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                style={{ borderColor: 'var(--primary)' }}
+              />
+            </div>
+          )}
+
+          {error && <p style={{ color: 'var(--accent-red)', fontSize: '0.875rem', textAlign: 'center' }}>{error}</p>}
+
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '14px' }}>
+            {isRegistering ? '登録する' : 'ログインする'}
+          </button>
+        </form>
+
+        <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+          <button 
+            className="btn" 
+            style={{ width: '100%', background: 'transparent', border: '1px solid #ddd', fontSize: '0.9rem' }}
+            onClick={() => {
+              setIsRegistering(!isRegistering);
+              setError('');
+              setKeyword('');
+            }}
+          >
+            {isRegistering ? 'ログインに戻る' : '新規ユーザー登録はこちら'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Main Components ---
+
+const TopScreen = ({ user }) => {
   const navigate = useNavigate();
   return (
     <div className="container fade-in">
       <header style={{ textAlign: 'center', marginBottom: '3rem' }}>
         <h1 style={{ fontSize: '2.5rem', fontWeight: '800', marginBottom: '0.5rem' }}>設備台帳システム</h1>
-        <p style={{ color: 'var(--text-muted)' }}>工場の設備情報をスマートに管理</p>
+        <p style={{ color: 'var(--text-muted)' }}>工場の設備情報をスマートに管理 ({user?.email})</p>
       </header>
       
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
@@ -510,11 +678,40 @@ const PhotoUpload = ({ onPhotosChange }) => {
 
 // --- App ---
 
+const ProtectedRoute = ({ user, children }) => {
+  if (!user) {
+    return <LoginScreen onLogin={() => {}} />; // ここでは直接返さず App で制御するためだけのプレースホルダー
+  }
+  return children;
+};
+
 function App() {
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('auth-user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+
+  const handleLogin = (userData) => {
+    setUser(userData);
+    localStorage.setItem('auth-user', JSON.stringify(userData));
+  };
+
+  const handleLogout = () => {
+    console.log('Logout button clicked');
+    // 確実に動作させるため、確認ダイアログを一旦削除
+    setUser(null);
+    localStorage.removeItem('auth-user');
+  };
+
+  if (!user) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
   return (
     <Router>
+      <LogoutButton user={user} onLogout={handleLogout} />
       <Routes>
-        <Route path="/" element={<TopScreen />} />
+        <Route path="/" element={<TopScreen user={user} />} />
         <Route path="/create" element={<CreateScreen />} />
         <Route path="/list" element={<ListScreen />} />
         <Route path="/detail/:id" element={<DetailScreen />} />
